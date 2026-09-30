@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plastic Defect Inspector — QA Inspection</title>
+  <meta name="description" content="Upload gambar produk plastic injection untuk deteksi cacat otomatis menggunakan YOLO Computer Vision">
+  <meta name="theme-color" content="#0b1120">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230b1120'/><circle cx='16' cy='16' r='6' fill='none' stroke='%2322d3ee' stroke-width='2'/><circle cx='16' cy='16' r='2' fill='%2322d3ee'/></svg>">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            darkbg: '#0b1120',
+            darkcard: '#111827',
+            darkborder: '#1f2937',
+            accent: '#22d3ee',
+            'accent-dim': '#06b6d4',
+          },
+          fontFamily: {
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+        },
+      },
+    }
+  </script>
+  <style>
+    /* custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0b1120; }
+    ::-webkit-scrollbar-thumb { background: #22d3ee33; border-radius: 100px; }
+    ::-webkit-scrollbar-thumb:hover { background: #22d3ee66; }
+    /* glow effect */
+    .glow-accent {
+      box-shadow: 0 0 24px -6px rgba(34, 211, 238, 0.25);
+    }
+  </style>
+</head>
+<body class="bg-darkbg text-gray-200 font-sans antialiased">
+
+  <!-- Navbar -->
+  <nav class="sticky top-0 z-30 border-b border-darkborder/60 bg-darkbg/80 backdrop-blur-md">
+    <div class="mx-auto flex h-14 max-w-5xl items-center justify-between px-6">
+      <a href="/" class="flex items-center gap-2.5">
+        <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-cyan-600 text-darkbg font-bold text-sm shadow-lg">P</span>
+        <span class="font-semibold text-white">Plastic Defect Inspector</span>
+      </a>
+      <!-- Tab Navigation -->
+      <div class="flex items-center gap-1 rounded-xl bg-darkcard/60 p-1 border border-darkborder/50">
+        <a href="/"
+           class="inline-flex items-center gap-2 rounded-lg px-4 py-1.5 text-sm font-medium transition
+                  bg-accent/20 text-accent shadow-sm">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+          </svg>
+          Mode Manual Upload
+        </a>
+        <a href="/live"
+           class="hidden sm:inline-flex items-center gap-2 rounded-lg px-4 py-1.5 text-sm font-medium transition
+                  text-gray-400 hover:text-white hover:bg-darkborder/50">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
+          </svg>
+          Mode Kamera Live
+        </a>
+      </div>
+
+      <div class="flex items-center gap-4 text-xs text-gray-500">
+        <span class="hidden sm:inline font-mono">v0.1.0 · YOLO CV</span>
+        <a href="/health" class="hover:text-accent transition" target="_blank">Health</a>
+        <a href="/api/info" class="hover:text-accent transition" target="_blank">API Info</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <main class="mx-auto max-w-5xl px-6 py-12 sm:py-16">
+
+    <!-- Header -->
+    <div class="mb-10 text-center">
+      <p class="mb-3 font-mono text-[11px] uppercase tracking-[0.2em] text-accent/70">Quality Assurance · Injection Molding</p>
+      <h1 class="text-3xl font-bold tracking-tight text-white sm:text-4xl">Pengecekan Defect <span class="bg-gradient-to-r from-accent to-cyan-500 bg-clip-text text-transparent">Plastic Injection</span></h1>
+      <p class="mt-3 max-w-lg text-sm text-gray-400">Upload gambar produk Anda. Sistem akan mendeteksi cacat menggunakan Computer Vision dan mengembalikan status QA beserta koordinat cacat.</p>
+    </div>
+
+    <!-- Upload card -->
+    <div class="mb-8 rounded-2xl border border-darkborder bg-darkcard/70 p-6 shadow-xl sm:p-8">
+      <div class="flex items-center gap-3 border-b border-darkborder/50 pb-4 mb-6">
+        <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10 text-accent">
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+          </svg>
+        </div>
+        <h2 class="text-lg font-semibold text-white">Upload Gambar Produk</h2>
+      </div>
+
+      <!-- Drop zone -->
+      <form id="uploadForm" class="relative">
+        <div
+          id="dropZone"
+          class="group relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-darkborder/70 bg-darkbg/40 p-10 transition hover:border-accent/40 hover:bg-darkbg/60"
+          style="cursor:pointer;"
+        >
+          <input
+            type="file"
+            id="fileInput"
+            name="file"
+            accept="image/jpeg,image/png,image/webp"
+            class="hidden"
+            aria-label="Pilih file gambar"
+          />
+
+          <!-- icon upload -->
+          <div class="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-accent/10 text-accent group-hover:bg-accent/20 transition">
+            <svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.867 2.88l-2.12a4 4 0 01-2.88-.867A4 4 0 014 12a4 4 0 012.88-.867l2.12-2.12a4 4 0 012.88.867V16a4 4 0 01-.867 2.88l-2.12a4 4 0 01-2.88-.867A4 4 0 014 8a4 4 0 012.12-2.88l2.12 2.12a4 4 0 01-.867-2.88V6a4 4 0 012.88-.867A4 4 0 018 4c1.5 0 2.88.5 4 1.333V2c-1.5 0-2.88.5-4 1.333A4 4 0 014 2a4 4 0 01-2 2v2a4 4 0 012-2.12l2.12 2.12a4 4 0 012.88.867A4 4 0 0112 8a4 4 0 012.12 2.88l-2.12 2.12a4 4 0 01-2.88.867A4 4 0 018 12v4a4 4 0 01-2.12 2.88l-2.12-2.12a4 4 0 01-.867-2.88V12a4 4 0 01-4-1.333A4 4 0 014 8a4 4 0 012.12-2.88l2.12-2.12a4 4 0 012.88.867z" />
+            </svg>
+          </div>
+
+          <p class="text-sm font-medium text-gray-300">
+            <span class="text-accent underline decoration-dotted underline-offset-4 decoration-accent/40 group-hover:decoration-accent/70">Klik untuk memilih</span>
+            <span class="hidden sm:inline"> atau seret gambar ke sini</span>
+          </p>
+          <p class="mt-1.5 text-xs text-gray-500">JPG, PNG, WebP — maks. 10MB</p>
+
+          <!-- preview thumbnail (muncul setelah file dipilih) -->
+          <div id="previewContainer" class="hidden mt-5 flex items-center gap-4 rounded-lg border border-darkborder/50 bg-darkbg/60 p-3">
+            <img id="previewImg" class="h-14 w-14 rounded object-cover border border-darkborder/30" alt="preview">
+            <span id="previewName" class="text-sm text-gray-300 truncate font-mono"></span>
+            <button
+              type="button"
+              id="clearBtn"
+              class="ml-auto shrink-0 flex h-7 w-7 items-center justify-center rounded-full bg-red-500/10 text-red-400 hover:bg-red-500/25 transition"
+              aria-label="Hapus file"
+            >
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- tombol submit -->
+        <div class="mt-6 flex flex-col gap-3 sm:flex-row">
+          <button
+            type="submit"
+            id="submitBtn"
+            class="disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-6 py-2.5 font-medium text-darkbg shadow-lg transition hover:bg-accent-dim hover:shadow-accent/20 disabled:shadow-none"
+            style="pointer-events:none;"
+          >
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <span id="submitLabel">Upload & Inspect</span>
+            <svg id="spinner" class="hidden animate-spin h-4 w-4 text-darkbg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+          </button>
+          <p id="uploadStatus" class="text-xs text-gray-500">Belum ada gambar yang dipilih.</p>
+        </div>
+      </form>
+    </div>
+
+    <!-- Hasil / Results -->
+    <div id="resultCard" class="hidden rounded-2xl border border-accent/30 bg-darkcard/80 p-6 shadow-xl sm:p-8">
+
+      <!-- header result -->
+      <div class="mb-6 flex items-center justify-between border-b border-darkborder/50 pb-4">
+        <div class="flex items-center gap-3">
+          <div id="resultIcon" class="flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/10 text-red-400">
+            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <div>
+            <h2 class="text-lg font-semibold text-white">Hasil Inspeksi</h2>
+            <p id="resultMeta" class="text-xs text-gray-500 font-mono">—</p>
+          </div>
+        </div>
+        <span id="resultBadge" class="rounded-full px-3 py-1 text-xs font-semibold font-mono">—</span>
+      </div>
+
+      <!-- Status besar -->
+      <div class="mb-6 flex items-center gap-4">
+        <div class="flex h-14 w-14 items-center justify-center rounded-full text-2xl" id="statusCircle">
+          <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <div>
+          <p class="text-xl font-bold text-white" id="statusTitle">—</p>
+          <p class="text-sm text-gray-400" id="statusDesc">—</p>
+        </div>
+      </div>
+
+      <!-- Detail cacat -->
+      <div id="defectsContainer" class="space-y-3">
+        <!-- diisi secara dinamis -->
+      </div>
+
+      <!-- info teknis -->
+      <div class="mt-6 flex flex-wrap gap-3 rounded-xl border border-darkborder/50 bg-darkbg/50 p-4">
+        <span class="rounded-lg bg-darkcard px-3 py-1.5 text-xs font-mono text-gray-400">
+          <span class="text-gray-500">Image ID:</span> <span id="resultImageId" class="text-accent">—</span>
+        </span>
+        <span class="rounded-lg bg-darkcard px-3 py-1.5 text-xs font-mono text-gray-400">
+          <span class="text-gray-500">Dimensi:</span> <span id="resultDims" class="text-gray-200">—</span>
+        </span>
+        <span class="rounded-lg bg-darkcard px-3 py-1.5 text-xs font-mono text-gray-400">
+          <span class="text-gray-500">Inference:</span> <span id="resultTime" class="text-accent">—</span> ms
+        </span>
+        <span class="rounded-lg bg-darkcard px-3 py-1.5 text-xs font-mono text-gray-400">
+          <span class="text-gray-500">File:</span> <span id="resultFilename" class="text-gray-200 truncate max-w-[180px]">—</span>
+        </span>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-darkborder/50 px-6 py-8">
+    <div class="flex flex-col items-center gap-2 text-xs text-gray-500 sm:flex-row sm:justify-between">
+      <span>Plastic Defect Inspector · Backend FastAPI + YOLO CV</span>
+      <span>Built for QA inspection workflow</span>
+    </div>
+  </footer>
+
+  <!-- Toast error -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 hidden animate-fade-in rounded-xl bg-red-900/90 px-5 py-3 shadow-2xl">
+    <p id="toastMsg" class="text-sm text-red-200"></p>
+  </div>
+
+  <script>
+    const dropZone  = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const previewC  = document.getElementById('previewContainer');
+    const previewImg = document.getElementById('previewImg');
+    const previewName = document.getElementById('previewName');
+    const clearBtn  = document.getElementById('clearBtn');
+    const submitBtn = document.getElementById('submitBtn');
+    const submitLabel = document.getElementById('submitLabel');
+    const spinner   = document.getElementById('spinner');
+    const uploadStatus = document.getElementById('uploadStatus');
+    const resultCard = document.getElementById('resultCard');
+    const toast     = document.getElementById('toast');
+    const toastMsg  = document.getElementById('toastMsg');
+
+    let selectedFile = null;
+
+    // ── click to upload ──
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    // ── drag & drop ──
+    ['dragenter', 'dragover'].forEach(evt =>
+      dropZone.addEventListener(evt, e => {
+        e.preventDefault();
+        dropZone.classList.add('border-accent/50', 'bg-darkbg/70');
+      })
+    );
+    ['dragleave', 'drop'].forEach(evt =>
+      dropZone.addEventListener(evt, e => {
+        e.preventDefault();
+        if (evt.type === 'drop') {
+          const file = e.dataTransfer.files[0];
+          if (file && file.type.startsWith('image/')) handleFile(file);
+        }
+        dropZone.classList.remove('border-accent/50', 'bg-darkbg/70');
+      })
+    );
+
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length) handleFile(fileInput.files[0]);
+    });
+
+    clearBtn.addEventListener('click', () => {
+      selectedFile = null;
+      fileInput.value = '';
+      previewC.classList.add('hidden');
+      uploadStatus.textContent = 'File dihapus. Pilih gambar baru.';
+      uploadStatus.className = 'text-xs text-gray-500';
+    });
+
+    function handleFile(file) {
+      const maxMB = 10;
+      if (file.size > maxMB * 1024 * 1024) {
+        showToast(`File terlalu besar (maks. ${maxMB}MB)`);
+        return;
+      }
+      selectedFile = file;
+      const url = URL.createObjectURL(file);
+      previewImg.src = url;
+      previewName.textContent = file.name;
+      previewC.classList.remove('hidden');
+      uploadStatus.textContent = `✓ ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB) — siap di-inspect`;
+      uploadStatus.className = 'text-xs text-accent';
+      submitBtn.style.pointerEvents = 'auto';
+      submitBtn.disabled = false;
+    }
+
+    // ── submit ──
+    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!selectedFile) return;
+
+      submitBtn.disabled = true;
+      submitBtn.style.pointerEvents = 'none';
+      submitLabel.textContent = 'Menginspeksi...';
+      spinner.classList.remove('hidden');
+      uploadStatus.textContent = 'Mengirim gambar ke server...';
+      uploadStatus.className = 'text-xs text-gray-400';
+
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+
+      try {
+        const res = await fetch('/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({ detail: res.statusText }));
+          showToast(`Gagal: ${errData.detail || res.status}`, 6000);
+          throw new Error(errData.detail);
+        }
+
+        const data = await res.json();
+        renderResult(data);
+        uploadStatus.textContent = `✓ Inspeksi selesai dalam ${data.inference_time_ms} ms`;
+        uploadStatus.className = 'text-xs text-accent';
+      } catch (err) {
+        console.error(err);
+        submitLabel.textContent = 'Upload & Inspect';
+        spinner.classList.add('hidden');
+        submitBtn.disabled = false;
+        submitBtn.style.pointerEvents = 'auto';
+      }
+    });
+
+    // ── render hasil ──
+    function renderResult(data) {
+      resultCard.classList.remove('hidden');
+
+      // badge
+      const badge = document.getElementById('resultBadge');
+      if (data.status === 'Pass') {
+        badge.className = 'rounded-full bg-emerald-500/20 text-emerald-400 px-3 py-1 text-xs font-semibold font-mono';
+        badge.textContent = '✅ PASS';
+        document.getElementById('resultIcon').className = 'flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400';
+        document.getElementById('resultIcon').innerHTML =
+          '<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>';
+        document.getElementById('statusCircle').className = 'flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400';
+        document.getElementById('statusTitle').textContent = '✅ Produk Lolos QA';
+        document.getElementById('statusTitle').className = 'text-xl font-bold text-emerald-400';
+        document.getElementById('statusDesc').textContent = 'Tidak ada cacat terdeteksi. Produk memenuhi standar.';
+      } else {
+        badge.className = 'rounded-full bg-red-500/20 text-red-400 px-3 py-1 text-xs font-semibold font-mono';
+        badge.textContent = '❌ FAIL';
+        document.getElementById('resultIcon').className = 'flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/10 text-red-400';
+        document.getElementById('resultIcon').innerHTML =
+          '<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>';
+        document.getElementById('statusCircle').className = 'flex h-14 w-14 items-center justify-center rounded-full bg-red-500/20 text-red-400';
+        document.getElementById('statusTitle').textContent = '❌ Produk Gagal QA';
+        document.getElementById('statusTitle').className = 'text-xl font-bold text-red-400';
+        document.getElementById('statusDesc').textContent = `${data.defects.length} cacat terdeteksi. Perlu ditinjau ulang.`;
+      }
+
+      // meta
+      document.getElementById('resultMeta').textContent = `${data.filename} · ${data.image_width}×${data.image_height}`;
+      document.getElementById('resultImageId').textContent = data.image_id;
+      document.getElementById('resultDims').textContent = `${data.image_width} × ${data.image_height} px`;
+      document.getElementById('resultTime').textContent = data.inference_time_ms;
+      document.getElementById('resultFilename').textContent = data.filename;
+
+      // defects list
+      const container = document.getElementById('defectsContainer');
+      if (data.defects.length === 0) {
+        container.innerHTML = `
+          <div class="flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+            <svg class="h-5 w-5 shrink-0 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <p class="text-sm text-emerald-300">Tidak ada cacat. Produk dalam kondisi baik.</p>
+          </div>
+        `;
+      } else {
+        container.innerHTML = data.defects.map((d, i) => `
+          <div class="rounded-xl border border-red-500/20 bg-red-500/5 p-4">
+            <div class="mb-2 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="rounded-lg bg-red-500/20 px-2 py-0.5 text-xs font-mono font-medium text-red-400">#${i + 1}</span>
+                <span class="font-semibold text-red-300">${d.label}</span>
+              </div>
+              <span class="rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-mono text-red-400/80">${d.confidence.toFixed(3)}</span>
+            </div>
+            <div class="flex flex-wrap gap-x-6 gap-y-1 text-xs font-mono text-gray-500">
+              <span>BBox normalized: [${d.bbox.map(v => v.toFixed(3)).join(', ')}]</span>
+              <span>x_min: ${d.bbox[0].toFixed(3)} · y_min: ${d.bbox[1].toFixed(3)} · x_max: ${d.bbox[2].toFixed(3)} · y_max: ${d.bbox[3].toFixed(3)}</span>
+            </div>
+          </div>
+        `).join('');
+      }
+    }
+
+    // ── toast ──
+    function showToast(msg, duration = 4000) {
+      toastMsg.textContent = msg;
+      toast.classList.remove('hidden');
+      setTimeout(() => toast.classList.add('hidden'), duration);
+    }
+
+    // sembunyikan spinner saat berubah halaman / error network
+    window.addEventListener('beforeunload', () => {
+      spinner.classList.add('hidden');
+      submitBtn.disabled = false;
+      submitBtn.style.pointerEvents = 'auto';
+      submitLabel.textContent = 'Upload & Inspect';
+    });
+  </script>
+</body>
+</html>

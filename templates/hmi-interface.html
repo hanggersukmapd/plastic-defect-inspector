@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>HMI · Plastic Injection Defect Inspector</title>
+  <meta name="description" content="Human-Machine Interface — Inspeksi cacat otomatis produk plastic injection berbasis YOLO Computer Vision">
+  <meta name="theme-color" content="#0a0f1a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230a0f1a'/><rect x='6' y='14' width='20' height='2' fill='%23475569'/><rect x='10' y='10' width='12' height='2' fill='%23475569'/><rect x='10' y='20' width='12' height='2' fill='%23475569'/><circle cx='11' cy='11' r='2' fill='%23ef4444'/><circle cx='21' cy='11' r='2' fill='%2322c55e'/></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary:    #0a0f1a;
+      --bg-secondary:  #111827;
+      --bg-card:       #1a2236;
+      --bg-elevated:   #1e293b;
+      --bg-highlight:  #263348;
+      --border:        #2d3a4f;
+      --border-strong: #3d4a63;
+      --text-primary:  #e2e8f0;
+      --text-secondary:#94a3b8;
+      --text-muted:    #64748b;
+      --text-dim:      #475569;
+      --accent:        #22d3ee;
+      --accent-dim:    #0891b2;
+      --accent-glow:   rgba(34, 211, 238, 0.15);
+      --pass:          #22c55e;
+      --pass-bg:       rgba(34, 197, 94, 0.12);
+      --pass-border:   rgba(34, 197, 94, 0.35);
+      --fail:          #ef4444;
+      --fail-bg:       rgba(239, 68, 68, 0.15);
+      --fail-border:   rgba(239, 68, 68, 0.50);
+      --warn:          #f59e0b;
+      --radius-sm:  6px;
+      --radius-md:  10px;
+      --radius-lg:  14px;
+      --radius-xl:  20px;
+      --touch-min: 48px;
+      --touch-lg:  56px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-size: 14px; line-height: 1.45;
+      color: var(--text-primary); background: var(--bg-primary);
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+    }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: var(--bg-primary); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 100px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+      border-radius: var(--radius-sm);
+    }
+    .hmi-app { display: flex; flex-direction: column; height: 100vh; max-height: 100vh; overflow: hidden; }
+    .hmi-topbar {
+      display: flex; align-items: center; gap: 16px;
+      padding: 0 20px; height: 52px; flex-shrink: 0;
+      background: var(--bg-secondary); border-bottom: 1px solid var(--border);
+    }
+    .hmi-topbar__brand { display: flex; align-items: center; gap: 10px; }
+    .hmi-topbar__logo {
+      width: 34px; height: 34px; border-radius: 7px;
+      background: linear-gradient(135deg, var(--accent-dim), var(--accent));
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 16px; color: var(--bg-primary);
+      box-shadow: 0 0 16px rgba(34, 211, 238, 0.20);
+    }
+    .hmi-topbar__title { font-weight: 600; font-size: 15px; letter-spacing: 0.01em; color: var(--text-primary); white-space: nowrap; }
+    .hmi-topbar__subtitle { font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; letter-spacing: 0.05em; }
+    .hmi-topbar__spacer { flex: 1; }
+    .hmi-topbar__system { display: flex; align-items: center; gap: 12px; font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+    .hmi-topbar__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--pass); box-shadow: 0 0 8px var(--pass); }
+    .hmi-topbar__dot.offline { background: var(--fail); box-shadow: 0 0 8px var(--fail); }
+    .hmi-main { display: grid; grid-template-columns: 340px 1fr; gap: 0; flex: 1; min-height: 0; overflow: hidden; }
+    .hmi-left { display: flex; flex-direction: column; background: var(--bg-secondary); border-right: 1px solid var(--border); overflow: hidden; min-height: 0; }
+    .hmi-panel-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 14px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .hmi-panel-header__icon {
+      width: 28px; height: 28px; border-radius: 6px;
+      background: var(--accent-glow); color: var(--accent);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .hmi-panel-header__label { font-weight: 600; font-size: 13px; color: var(--text-primary); letter-spacing: 0.03em; }
+    .hmi-panel-header__count {
+      margin-left: auto; font-size: 11px; color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace; background: var(--bg-elevated);
+      padding: 2px 8px; border-radius: 100px; border: 1px solid var(--border);
+    }
+    .hmi-left__scroll {
+      flex: 1; overflow-y: auto; padding: 14px;
+      display: flex; flex-direction: column; gap: 14px; min-height: 0;
+    }
+    .hmi-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; }
+    .hmi-card__title {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12px; font-weight: 600; color: var(--text-secondary);
+      text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px;
+    }
+    .hmi-card__title svg { width: 16px; height: 16px; color: var(--text-muted); }
+    .drop-zone {
+      border: 2px dashed var(--border); border-radius: var(--radius-md);
+      padding: 20px 12px; text-align: center; cursor: pointer;
+      transition: all 0.15s ease; background: var(--bg-elevated);
+      position: relative; min-height: 100px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    }
+    .drop-zone:hover { border-color: var(--accent-dim); background: var(--bg-highlight); }
+    .drop-zone__icon {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: var(--accent-glow); color: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.15s ease;
+    }
+    .drop-zone:hover .drop-zone__icon { transform: scale(1.08); }
+    .drop-zone__text { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+    .drop-zone__text strong { color: var(--accent); font-weight: 600; }
+    .drop-zone__hint { font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+    .drop-zone.has-file { border-color: var(--accent); border-style: solid; background: var(--bg-highlight); }
+    .drop-zone__file-info { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 0; }
+    .drop-zone__file-thumb { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; border: 1px solid var(--border); flex-shrink: 0; }
+    .drop-zone__file-name { font-size: 12px; color: var(--text-primary); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+    .drop-zone__file-size { font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+    .drop-zone__clear-btn {
+      background: var(--fail-bg); color: var(--fail);
+      border: 1px solid var(--fail-border); border-radius: var(--radius-sm);
+      width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; flex-shrink: 0; transition: all 0.12s ease;
+    }
+    .drop-zone__clear-btn:hover { background: var(--fail); color: white; }
+    .param-group { margin-bottom: 0; }
+    .param-group:last-child { margin-bottom: 0; }
+    .param-label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .param-label__name { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
+    .param-label__value {
+      font-size: 13px; font-weight: 600; color: var(--accent);
+      font-family: 'JetBrains Mono', monospace; background: var(--bg-elevated);
+      padding: 2px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+      min-width: 44px; text-align: center;
+    }
+    input[type="range"] {
+      -webkit-appearance: none; appearance: none;
+      width: 100%; height: 6px; background: var(--bg-elevated);
+      border-radius: 100px; outline: none; border: 1px solid var(--border);
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: var(--accent); cursor: pointer;
+      border: 2px solid var(--bg-primary);
+      box-shadow: 0 0 8px rgba(34, 211, 238, 0.35);
+      transition: box-shadow 0.12s ease;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover { box-shadow: 0 0 14px rgba(34, 211, 238, 0.55); }
+    input[type="range"]::-moz-range-thumb {
+      width: 20px; height: 20px; border-radius: 50%;
+      background: var(--accent); cursor: pointer;
+      border: 2px solid var(--bg-primary);
+      box-shadow: 0 0 8px rgba(34, 211, 238, 0.35);
+    }
+    .mode-selector { display: flex; gap: 6px; background: var(--bg-elevated); border-radius: var(--radius-sm); padding: 3px; border: 1px solid var(--border); }
+    .mode-btn {
+      flex: 1; padding: 8px 10px; border: none; background: transparent;
+      color: var(--text-muted); font-size: 11px; font-weight: 600;
+      border-radius: 4px; cursor: pointer; transition: all 0.12s ease;
+      font-family: 'Space Grotesk', sans-serif; text-align: center;
+    }
+    .mode-btn:hover { color: var(--text-secondary); }
+    .mode-btn.active { background: var(--accent-dim); color: var(--bg-primary); box-shadow: 0 0 12px rgba(34, 211, 238, 0.15); }
+    .btn-primary {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      width: 100%; height: var(--touch-lg); padding: 0 18px;
+      background: var(--accent); color: var(--bg-primary); border: none;
+      border-radius: var(--radius-md); font-size: 14px; font-weight: 700;
+      font-family: 'Space Grotesk', sans-serif; cursor: pointer;
+      transition: all 0.12s ease; box-shadow: 0 4px 14px rgba(34, 211, 238, 0.22);
+      letter-spacing: 0.02em;
+    }
+    .btn-primary:hover { background: #67e8f9; box-shadow: 0 4px 20px rgba(34, 211, 238, 0.35); transform: translateY(-1px); }
+    .btn-primary:active { transform: translateY(1px); box-shadow: 0 2px 8px rgba(34, 211, 238, 0.20); }
+    .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; transform: none; }
+    .btn-secondary {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      height: var(--touch-min); padding: 0 14px;
+      background: var(--bg-elevated); color: var(--text-secondary);
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      font-size: 12px; font-weight: 600; font-family: 'Space Grotesk', sans-serif;
+      cursor: pointer; transition: all 0.12s ease;
+    }
+    .btn-secondary:hover { background: var(--bg-highlight); color: var(--text-primary); border-color: var(--border-strong); }
+    .btn-danger {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      height: var(--touch-min); padding: 0 14px;
+      background: var(--fail-bg); color: var(--fail);
+      border: 1px solid var(--fail-border); border-radius: var(--radius-sm);
+      font-size: 12px; font-weight: 600; font-family: 'Space Grotesk', sans-serif;
+      cursor: pointer; transition: all 0.12s ease;
+    }
+    .btn-danger:hover { background: var(--fail); color: white; }
+    .batch-actions { display: flex; gap: 8px; }
+    .batch-actions .btn-secondary { flex: 1; }
+    .hmi-right { display: flex; flex-direction: column; background: var(--bg-primary); min-height: 0; overflow: hidden; }
+    .hmi-canvas-toolbar {
+      display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+      background: var(--bg-secondary); border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .canvas-toolbar__status {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12px; font-weight: 600; font-family: 'JetBrains Mono', monospace;
+      padding: 5px 12px; border-radius: 100px; background: var(--bg-elevated); border: 1px solid var(--border);
+    }
+    .canvas-toolbar__status.pass { background: var(--pass-bg); color: var(--pass); border-color: var(--pass-border); }
+    .canvas-toolbar__status.fail { background: var(--fail-bg); color: var(--fail); border-color: var(--fail-border); animation: fail-pulse 1.2s ease-in-out infinite; }
+    .canvas-toolbar__status.ready { background: var(--bg-elevated); color: var(--text-muted); border-color: var(--border); }
+    .canvas-toolbar__spacer { flex: 1; }
+    .canvas-zoom-controls { display: flex; gap: 4px; }
+    .canvas-zoom-btn {
+      width: 32px; height: 32px; border-radius: var(--radius-sm);
+      background: var(--bg-elevated); color: var(--text-secondary);
+      border: 1px solid var(--border); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; font-weight: 700; transition: all 0.1s ease;
+    }
+    .canvas-zoom-btn:hover { background: var(--bg-highlight); color: var(--text-primary); }
+    .hmi-canvas-wrap {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      padding: 12px; overflow: hidden; position: relative; min-height: 0;
+      background:
+        repeating-linear-gradient(0deg, transparent, transparent 31px, rgba(45, 58, 79, 0.12) 31px, rgba(45, 58, 79, 0.12) 32px),
+        repeating-linear-gradient(90deg, transparent, transparent 31px, rgba(45, 58, 79, 0.12) 31px, rgba(45, 58, 79, 0.12) 32px);
+    }
+    #yoloCanvas {
+      border: 1px solid var(--border); border-radius: var(--radius-md);
+      background: var(--bg-elevated); max-width: 100%; max-height: 100%;
+      object-fit: contain; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+    }
+    .canvas-placeholder {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 12px; color: var(--text-muted); text-align: center; padding: 20px;
+    }
+    .canvas-placeholder svg { width: 56px; height: 56px; opacity: 0.3; }
+    .canvas-placeholder__title { font-size: 15px; font-weight: 600; color: var(--text-secondary); }
+    .canvas-placeholder__hint { font-size: 12px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; max-width: 280px; line-height: 1.5; }
+    .canvas-overlay-info {
+      position: absolute; bottom: 16px; left: 16px;
+      display: flex; gap: 8px; font-size: 11px; font-family: 'JetBrains Mono', monospace;
+      color: var(--text-muted); background: rgba(10, 15, 26, 0.80);
+      padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+      backdrop-filter: blur(8px); pointer-events: none;
+    }
+    .canvas-overlay-info span { display: flex; align-items: center; gap: 4px; }
+    .canvas-overlay-info .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); }
+    .canvas-overlay-info .dot.pass { background: var(--pass); }
+    .canvas-overlay-info .dot.fail { background: var(--fail); animation: fail-pulse 1.2s infinite; }
+    .hmi-indicator-bar {
+      display: flex; gap: 14px; padding: 10px 16px;
+      background: var(--bg-secondary); border-top: 1px solid var(--border);
+      flex-shrink: 0; align-items: center;
+    }
+    .hmi-indicator-item { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+    .hmi-indicator-led { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .hmi-indicator-led.green { background: var(--pass); box-shadow: 0 0 10px var(--pass); }
+    .hmi-indicator-led.red { background: var(--fail); box-shadow: 0 0 10px var(--fail); animation: fail-pulse 1.2s ease-in-out infinite; }
+    .hmi-indicator-led.gray { background: var(--text-muted); }
+    .hmi-indicator-label { color: var(--text-secondary); }
+    .hmi-bottom { flex-shrink: 0; background: var(--bg-secondary); border-top: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
+    .hmi-bottom__header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .hmi-bottom__header-label {
+      font-size: 12px; font-weight: 600; color: var(--text-secondary);
+      text-transform: uppercase; letter-spacing: 0.08em; display: flex; align-items: center; gap: 6px;
+    }
+    .hmi-bottom__header-count {
+      font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;
+      background: var(--bg-elevated); padding: 1px 7px; border-radius: 100px; border: 1px solid var(--border);
+    }
+    .hmi-bottom__header-spacer { flex: 1; }
+    .hmi-bottom__clear-btn { height: var(--touch-min); padding: 0 12px; }
+    .hmi-log-table-wrap { flex: 1; overflow-y: auto; min-height: 0; }
+    .hmi-log-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .hmi-log-table thead { position: sticky; top: 0; background: var(--bg-secondary); z-index: 2; }
+    .hmi-log-table th {
+      text-align: left; padding: 10px 14px; font-size: 10px; font-weight: 600;
+      color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.07em;
+      border-bottom: 1px solid var(--border); background: var(--bg-secondary); white-space: nowrap;
+    }
+    .hmi-log-table td {
+      padding: 9px 14px; border-bottom: 1px solid rgba(45, 58, 79, 0.4);
+      color: var(--text-secondary); font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; vertical-align: middle; white-space: nowrap;
+    }
+    .hmi-log-table tbody tr { transition: background 0.1s ease; }
+    .hmi-log-table tbody tr:hover { background: var(--bg-highlight); }
+    .hmi-log-table tbody tr.fail-row { border-left: 3px solid var(--fail); }
+    .hmi-log-table tbody tr.pass-row { border-left: 3px solid var(--pass); }
+    .log-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 10px; border-radius: 100px;
+      font-size: 11px; font-weight: 700; font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.04em;
+    }
+    .log-badge.pass { background: var(--pass-bg); color: var(--pass); border: 1px solid var(--pass-border); }
+    .log-badge.fail { background: var(--fail-bg); color: var(--fail); border: 1px solid var(--fail-border); animation: fail-pulse 1.2s ease-in-out infinite; }
+    .log-badge .icon { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .log-badge.pass .icon { background: var(--pass); box-shadow: 0 0 6px var(--pass); }
+    .log-badge.fail .icon { background: var(--fail); box-shadow: 0 0 6px var(--fail); }
+    .defect-count {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 22px; height: 22px; padding: 0 6px;
+      border-radius: 100px; font-size: 11px; font-weight: 700;
+      font-family: 'JetBrains Mono', monospace; background: var(--bg-elevated);
+      color: var(--text-secondary); border: 1px solid var(--border);
+    }
+    .defect-count.has-defects { background: var(--fail-bg); color: var(--fail); border-color: var(--fail-border); }
+    @keyframes fail-pulse {
+      0%, 100% { box-shadow: 0 0 4px rgba(239, 68, 68, 0.3); opacity: 1; }
+      50% { box-shadow: 0 0 14px rgba(239, 68, 68, 0.7); opacity: 0.85; }
+    }
+    @keyframes spin-hmi { to { transform: rotate(360deg); } }
+    .spinner-hmi {
+      width: 18px; height: 18px; border: 2px solid var(--bg-primary);
+      border-top-color: transparent; border-radius: 50%;
+      animation: spin-hmi 0.7s linear infinite;
+    }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
+    .hidden { display: none !important; }
+    .hmi-toast {
+      position: fixed; bottom: 20px; right: 20px; z-index: 1000;
+      padding: 12px 20px; border-radius: 8px; font-family: 'Space Grotesk', sans-serif;
+      font-size: 13px; font-weight: 600; box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      backdrop-filter: blur(12px); transform: translateY(20px); opacity: 0;
+      transition: all 0.25s ease; max-width: 360px;
+    }
+    @media (max-width: 860px) {
+      .hmi-main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+      .hmi-left { border-right: none; border-bottom: 1px solid var(--border); max-height: 40vh; }
+      .hmi-canvas-wrap { padding: 8px; }
+    }
+  </style>
+</head>
+<body>
+<div class="hmi-app">
+  <header class="hmi-topbar">
+    <div class="hmi-topbar__brand">
+      <div class="hmi-topbar__logo">P</div>
+      <div>
+        <div class="hmi-topbar__title">Plastic Injection Defect Inspector</div>
+        <div class="hmi-topbar__subtitle">HMI · QA Inspection Station</div>
+      </div>
+    </div>
+    <div class="hmi-topbar__spacer"></div>
+    <div class="hmi-topbar__system">
+      <span class="hmi-topbar__dot" id="sysDot" title="System Online"></span>
+      <span id="sysStatus">ONLINE</span>
+      <span class="hidden sm:inline">·</span>
+      <span class="hidden sm:inline" id="sysTime">--:--:--</span>
+    </div>
+  </header>
+  <div class="hmi-main">
+    <aside class="hmi-left" role="region" aria-label="Panel Kontrol">
+      <div class="hmi-panel-header">
+        <div class="hmi-panel-header__icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+            <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+          </svg>
+        </div>
+        <span class="hmi-panel-header__label">Kontrol & Parameter</span>
+        <span class="hmi-panel-header__count" id="inspectionCount">0 inspeksi</span>
+      </div>
+      <div class="hmi-left__scroll">
+        <div class="hmi-card">
+          <div class="hmi-card__title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4m4-5l5 5m0 0l-5 5m5-5V3"/></svg>
+            Unggah Gambar Produk
+          </div>
+          <div class="drop-zone" id="dropZone" role="button" tabindex="0" aria-label="Unggah gambar produk">
+            <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" class="hidden" aria-hidden="true">
+            <div id="dropZoneEmpty">
+              <div class="drop-zone__icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M7 16a4 4 0 01-.867 2.88l-2.12a4 4 0 01-2.88-.867A4 4 0 014 12a4 4 0 012.88-.867l2.12-2.12a4 4 0 012.88.867V16a4 4 0 01-.867 2.88l-2.12a4 4 0 01-2.88-.867A4 4 0 014 8a4 4 0 012.12-2.88l2.12 2.12a4 4 0 01-.867-2.88V6a4 4 0 012.88-.867A4 4 0 018 4c1.5 0 2.88.5 4 1.333V2c-1.5 0-2.88.5-4 1.333A4 4 0 014 2a4 4 0 01-2 2v2a4 4 0 012-2.12l2.12 2.12a4 4 0 012.88.867A4 4 0 0112 8a4 4 0 012.12 2.88l-2.12 2.12a4 4 0 01-2.88.867A4 4 0 018 12v4a4 4 0 01-2.12 2.88l-2.12-2.12a4 4 0 01-.867-2.88V12a4 4 0 01-4-1.333A4 4 0 014 8a4 4 0 012.12-2.88l2.12-2.12a4 4 0 012.88.867z"/>
+                </svg>
+              </div>
+              <p class="drop-zone__text"><strong>Klik</strong> atau seret gambar ke sini</p>
+              <p class="drop-zone__hint">JPG · PNG · WebP — maks. 10 MB</p>
+            </div>
+            <div id="dropZoneFile" class="hidden">
+              <div class="drop-zone__file-info">
+                <img id="fileThumb" class="drop-zone__file-thumb" alt="thumbnail">
+                <div class="drop-zone__file-name" id="fileName">—</div>
+                <span class="drop-zone__file-size" id="fileSize">—</span>
+                <button class="drop-zone__clear-btn" id="clearFileBtn" aria-label="Hapus file yang dipilih" title="Hapus file">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="mt-3 flex flex-col gap-2">
+            <button class="btn-primary" id="inspectBtn" disabled>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              <span id="inspectBtnLabel">Inspect Produk</span>
+            </button>
+            <div class="flex gap-2">
+              <button class="btn-secondary flex-1" id="clearBtn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                Reset
+              </button>
+              <button class="btn-secondary flex-1" id="sampleBtn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                Sample
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="hmi-card">
+          <div class="hmi-card__title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20M6.34 6.34l11.32 11.32M17.66 6.34L6.34 17.66"/></svg>
+            Threshold Parameter
+          </div>
+          <div class="param-group">
+            <div class="param-label">
+              <span class="param-label__name">Confidence Min.</span>
+              <span class="param-label__value" id="confValue">0.35</span>
+            </div>
+            <input type="range" id="confSlider" min="0.10" max="0.90" step="0.01" value="0.35" aria-label="Ambang confidence deteksi">
+          </div>
+          <div class="param-group" style="margin-top: 12px;">
+            <div class="param-label">
+              <span class="param-label__name">IoU Threshold (NMS)</span>
+              <span class="param-label__value" id="iouValue">0.45</span>
+            </div>
+            <input type="range" id="iouSlider" min="0.10" max="0.80" step="0.01" value="0.45" aria-label="Intersection over Union untuk NMS">
+          </div>
+          <div class="param-group" style="margin-top: 12px;">
+            <div class="param-label">
+              <span class="param-label__name">Max Detections</span>
+              <span class="param-label__value" id="maxDetValue">10</span>
+            </div>
+            <input type="range" id="maxDetSlider" min="1" max="50" step="1" value="10" aria-label="Maksimum jumlah deteksi per gambar">
+          </div>
+          <div class="mt-3 pt-2" style="border-top: 1px solid var(--border);">
+            <label class="param-label" style="margin-bottom: 0;">
+              <span class="param-label__name">Mode Inspeksi</span>
+            </label>
+            <div class="mode-selector" style="margin-top: 6px;">
+              <button class="mode-btn active" data-mode="auto" id="modeAuto">Auto</button>
+              <button class="mode-btn" data-mode="manual" id="modeManual">Manual</button>
+              <button class="mode-btn" data-mode="review" id="modeReview">Review</button>
+            </div>
+          </div>
+        </div>
+        <div class="hmi-card" style="background: var(--bg-elevated);">
+          <div style="font-size: 11px; color: var(--text-muted); line-height: 1.6;">
+            <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 4px;">
+              <span style="color: var(--accent); font-weight: 600;">YOLOv8</span>
+              <span style="color: var(--text-muted);">·</span>
+              <span style="color: var(--text-muted);">Nano</span>
+              <span style="color: var(--text-muted);">·</span>
+              <span style="color: var(--text-muted);">6 kelas defect</span>
+            </div>
+            <div style="font-family: 'JetBrains Mono', monospace; color: var(--text-dim);">
+              crack · short shot · flash · sink mark · burn · foreign material
+            </div>
+          </div>
+        </div>
+        <div style="font-size: 10px; color: var(--text-dim); text-align: center; padding: 8px 0 2px;">
+          HMI Station v1.0 · Touch-safe interface
+        </div>
+      </div>
+    </aside>
+    <main class="hmi-right" role="region" aria-label="Visualisasi YOLO">
+      <div class="hmi-canvas-toolbar">
+        <div class="canvas-toolbar__status ready" id="canvasStatus" role="status" aria-live="polite">
+          <span id="canvasStatusDot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--text-muted);"></span>
+          <span id="canvasStatusLabel">Siap</span>
+        </div>
+        <div class="canvas-toolbar__spacer"></div>
+        <div class="canvas-zoom-controls">
+          <button class="canvas-zoom-btn" id="zoomInBtn" aria-label="Perbesar" title="Zoom in">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14m-7-7h14"/></svg>
+          </button>
+          <button class="canvas-zoom-btn" id="zoomOutBtn" aria-label="Perkecil" title="Zoom out">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14m-7-7h14"/></svg>
+          </button>
+          <button class="canvas-zoom-btn" id="fitBtn" aria-label="Fit kanvas" title="Fit">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="hmi-canvas-wrap" id="canvasWrap">
+        <canvas id="yoloCanvas" width="800" height="600" aria-label="Visualisasi bounding box YOLO"></canvas>
+        <div class="canvas-placeholder" id="canvasPlaceholder">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+          <div class="canvas-placeholder__title">Belum ada gambar</div>
+          <div class="canvas-placeholder__hint">Upload gambar produk dari panel kiri<br>untuk melihat visualisasi bounding box</div>
+        </div>
+        <div class="canvas-overlay-info hidden" id="canvasOverlay">
+          <span><span class="dot" id="overlayDot"></span><span id="overlayStatus">—</span></span>
+          <span>📷 <span id="overlayDims">—</span></span>
+          <span>⚡ <span id="overlayTime">—</span>ms</span>
+        </div>
+      </div>
+      <div class="hmi-indicator-bar">
+        <div class="hmi-indicator-item">
+          <span class="hmi-indicator-led gray" id="indLedStatus"></span>
+          <span class="hmi-indicator-label" id="indLabelStatus">Status: —</span>
+        </div>
+        <div class="hmi-indicator-item">
+          <span class="hmi-indicator-led gray" id="indLedDefects"></span>
+          <span class="hmi-indicator-label" id="indLabelDefects">Defect: —</span>
+        </div>
+        <div class="hmi-indicator-item">
+          <span class="hmi-indicator-led gray" id="indLedConfidence"></span>
+          <span class="hmi-indicator-label" id="indLabelConfidence">Conf: —</span>
+        </div>
+        <div class="hmi-indicator-item" style="margin-left: auto;">
+          <span class="hmi-indicator-led gray" id="indLedModel"></span>
+          <span class="hmi-indicator-label">YOLOv8 Nano · 6 kelas</span>
+        </div>
+      </div>
+    </main>
+  </div>
+  <section class="hmi-bottom" role="region" aria-label="Riwayat Inspeksi">
+    <div class="hmi-bottom__header">
+      <div class="hmi-bottom__header-label">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        Riwayat Inspeksi
+      </div>
+      <span class="hmi-bottom__header-count" id="logCount">0</span>
+      <div class="hmi-bottom__header-spacer"></div>
+      <button class="btn-danger hmi-bottom__clear-btn" id="clearLogBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/></svg>
+        Hapus Semua
+      </button>
+    </div>
+    <div class="hmi-log-table-wrap">
+      <table class="hmi-log-table" id="logTable">
+        <thead>
+          <tr>
+            <th style="width:50px;">#</th>
+            <th>Waktu</th>
+            <th>File</th>
+            <th style="width:80px;">Status</th>
+            <th style="width:70px;">Defect</th>
+            <th>Conf.</th>
+            <th>Dimensi</th>
+          </tr>
+        </thead>
+        <tbody id="logBody"></tbody>
+      </table>
+      <div id="logEmpty" style="display:flex;align-items:center;justify-content:center;padding:40px;color:var(--text-muted);font-size:12px;font-family:'Space Grotesk',sans-serif;text-align:center;">
+        <span>Belum ada riwayat inspeksi.<br>Upload gambar untuk memulai.</span>
+      </div>
+    </div>
+  </section>
+</div>
+<script>
+(function () {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+
+  const dropZone            = $('dropZone');
+  const fileInput           = $('fileInput');
+  const dropZoneEmpty       = $('dropZoneEmpty');
+  const dropZoneFile        = $('dropZoneFile');
+  const fileThumb           = $('fileThumb');
+  const fileName            = $('fileName');
+  const fileSize            = $('fileSize');
+  const clearFileBtn        = $('clearFileBtn');
+  const inspectBtn          = $('inspectBtn');
+  const inspectBtnLabel     = $('inspectBtnLabel');
+  const clearBtn            = $('clearBtn');
+  const sampleBtn           = $('sampleBtn');
+  const canvas              = $('yoloCanvas');
+  const ctx                 = canvas.getContext('2d');
+  const canvasPlaceholder   = $('canvasPlaceholder');
+  const canvasOverlay       = $('canvasOverlay');
+  const canvasStatus        = $('canvasStatus');
+  const canvasStatusDot     = $('canvasStatusDot');
+  const canvasStatusLabel   = $('canvasStatusLabel');
+  const overlayDot          = $('overlayDot');
+  const overlayStatus       = $('overlayStatus');
+  const overlayDims         = $('overlayDims');
+  const overlayTime         = $('overlayTime');
+  const logBody             = $('logBody');
+  const logEmpty            = $('logEmpty');
+  const logCount            = $('logCount');
+  const clearLogBtn         = $('clearLogBtn');
+  const inspectionCount     = $('inspectionCount');
+
+  const indLedStatus        = $('indLedStatus');
+  const indLabelStatus      = $('indLabelStatus');
+  const indLedDefects       = $('indLedDefects');
+  const indLabelDefects     = $('indLabelDefects');
+  const indLedConfidence    = $('indLedConfidence');
+  const indLabelConfidence  = $('indLabelConfidence');
+
+  const confSlider   = $('confSlider');
+  const confValue    = $('confValue');
+  const iouSlider    = $('iouSlider');
+  const iouValue     = $('iouValue');
+  const maxDetSlider = $('maxDetSlider');
+  const maxDetValue  = $('maxDetValue');
+
+  const modeAuto   = $('modeAuto');
+  const modeManual = $('modeManual');
+  const modeReview = $('modeReview');
+
+  const zoomInBtn  = $('zoomInBtn');
+  const zoomOutBtn = $('zoomOutBtn');
+  const fitBtn     = $('fitBtn');
+
+  let selectedFile        = null;
+  let imageURL            = null;
+  let imageDimensions     = { width: 0, height: 0 };
+  let inspectionLog       = [];
+  let currentInspectionId = 0;
+  let drawScale           = 1.0;
+  let thresholdConf       = 0.35;
+  let thresholdIou        = 0.45;
+  let thresholdMaxDet     = 10;
+  let inspectionMode      = 'auto';
+
+  function updateSystemTime() {
+    const now = new Date();
+    $('sysTime').textContent = now.toLocaleTimeString('id-ID', { hour12: false });
+  }
+  updateSystemTime();
+  setInterval(updateSystemTime, 1000);
+
+  confSlider.addEventListener('input', () => {
+    thresholdConf = parseFloat(confSlider.value);
+    confValue.textContent = thresholdConf.toFixed(2);
+  });
+  iouSlider.addEventListener('input', () => {
+    thresholdIou = parseFloat(iouSlider.value);
+    iouValue.textContent = thresholdIou.toFixed(2);
+  });
+  maxDetSlider.addEventListener('input', () => {
+    thresholdMaxDet = Math.round(parseFloat(maxDetSlider.value));
+    maxDetValue.textContent = thresholdMaxDet;
+  });
+
+  function setMode(mode) {
+    inspectionMode = mode;
+    [modeAuto, modeManual, modeReview].forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.mode === mode);
+    });
+  }
+  modeAuto.addEventListener('click',  () => setMode('auto'));
+  modeManual.addEventListener('click',() => setMode('manual'));
+  modeReview.addEventListener('click',() => setMode('review'));
+
+  dropZone.addEventListener('click', (e) => {
+    if (e.target.closest('#clearFileBtn')) return;
+    fileInput.click();
+  });
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files.length) handleFile(fileInput.files[0]);
+  });
+  clearFileBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    clearFile();
+  });
+  ['dragenter','dragover'].forEach(evt => {
+    dropZone.addEventListener(evt, e => {
+      e.preventDefault();
+      dropZone.style.borderColor = 'var(--accent)';
+      dropZone.style.background  = 'var(--bg-highlight)';
+    });
+  });
+  ['dragleave','drop'].forEach(evt => {
+    dropZone.addEventListener(evt, e => {
+      e.preventDefault();
+      dropZone.style.borderColor = '';
+      dropZone.style.background  = '';
+      if (evt.type === 'drop') {
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/')) handleFile(file);
+      }
+    });
+  });
+
+  function handleFile(file) {
+    if (!file.type.startsWith('image/')) { showToast('File bukan gambar yang didukung.'); return; }
+    if (file.size > 10 * 1024 * 1024) { showToast('File terlalu besar. Maksimal 10 MB.'); return; }
+    selectedFile = file;
+    if (imageURL) URL.revokeObjectURL(imageURL);
+    imageURL = URL.createObjectURL(file);
+    dropZoneEmpty.classList.add('hidden');
+    dropZoneFile.classList.remove('hidden');
+    dropZone.classList.add('has-file');
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      fileThumb.src = e.target.result;
+      fileName.textContent = file.name;
+      fileSize.textContent = formatBytes(file.size);
+    };
+    reader.readAsDataURL(file);
+    clearCanvasImage();
+    inspectBtn.disabled = false;
+    inspectBtnLabel.textContent = 'Inspect Produk';
+    showToast(`✓ ${file.name} dipilih`);
+  }
+
+  function clearFile() {
+    selectedFile = null;
+    if (imageURL) { URL.revokeObjectURL(imageURL); imageURL = null; }
+    fileInput.value = '';
+    dropZoneEmpty.classList.remove('hidden');
+    dropZoneFile.classList.add('hidden');
+    dropZone.classList.remove('has-file');
+    inspectBtn.disabled = true;
+    inspectBtnLabel.textContent = 'Inspect Produk';
+    clearCanvasImage();
+    resetStatusIndicators();
+    showToast('File dihapus');
+  }
+  clearBtn.addEventListener('click', clearFile);
+
+  sampleBtn.addEventListener('click', generateSampleImage);
+  function generateSampleImage() {
+    const w = 800, h = 600;
+    canvas.width  = w;
+    canvas.height = h;
+    imageDimensions = { width: w, height: h };
+    ctx.clearRect(0, 0, w, h);
+    const grad = ctx.createLinearGradient(0, 0, w, h);
+    grad.addColorStop(0, '#1a2535');
+    grad.addColorStop(1, '#0f1625');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = 'rgba(45, 58, 79, 0.5)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= w; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+    for (let y = 0; y <= h; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+    canvas.toBlob((blob) => {
+      const file = new File([blob], 'sample_product.png', { type: 'image/png' });
+      selectedFile = file;
+      if (imageURL) URL.revokeObjectURL(imageURL);
+      imageURL = URL.createObjectURL(file);
+      dropZoneEmpty.classList.add('hidden');
+      dropZoneFile.classList.remove('hidden');
+      dropZone.classList.add('has-file');
+      fileThumb.src = canvas.toDataURL();
+      fileName.textContent = 'sample_product.png';
+      fileSize.textContent = '—';
+      inspectBtn.disabled = false;
+      inspectBtnLabel.textContent = 'Inspect Produk';
+      overlayDims.textContent = `${w}×${h}`;
+      canvasPlaceholder.classList.add('hidden');
+      canvasOverlay.classList.remove('hidden');
+      updateCanvasStatus('ready', 'Sample Siap');
+      showToast('✓ Sample gambar dimuat');
+    }, 'image/png');
+  }
+
+  function clearCanvasImage() {
+    canvas.width  = 800;
+    canvas.height = 600;
+    ctx.clearRect(0, 0, 800, 600);
+    canvasPlaceholder.classList.remove('hidden');
+    canvasOverlay.classList.add('hidden');
+    imageDimensions = { width: 0, height: 0 };
+    resetStatusIndicators();
+    updateCanvasStatus('ready', 'Siap');
+    overlayDims.textContent = '—';
+    overlayTime.textContent = '—';
+  }
+  function drawImageOnCanvas() {
+    if (!imageURL) return;
+    const img = new Image();
+    img.onload = () => {
+      imageDimensions = { width: img.width, height: img.height };
+      canvas.width  = img.width;
+      canvas.height = img.height;
+      ctx.clearRect(0, 0, img.width, img.height);
+      ctx.drawImage(img, 0, 0);
+      canvasPlaceholder.classList.add('hidden');
+      canvasOverlay.classList.remove('hidden');
+      overlayDims.textContent = `${img.width}×${img.height}`;
+      resetStatusIndicators();
+      updateCanvasStatus('ready', 'Gambar Dimuat');
+    };
+    img.src = imageURL;
+  }
+
+  function drawBoundingBoxes(detections) {
+    const { width, height } = imageDimensions;
+    const img = new Image();
+    img.onload = () => {
+      ctx.clearRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0);
+      detections.forEach((det, i) => {
+        const [x1, y1, x2, y2] = det.bbox.map(v => v * width);
+        const hue = (i * 60) % 360;
+        const color = `hsl(${hue}, 85%, 55%)`;
+        ctx.strokeStyle = color;
+        ctx.lineWidth   = 2.5;
+        ctx.setLineDash([]);
+        ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+        const labelText = `${det.label} ${det.confidence.toFixed(2)}`;
+        ctx.font = 'bold 13px "Space Grotesk", sans-serif';
+        const metrics = ctx.measureText(labelText);
+        const padX = 6, padY = 3;
+        const labelH = 20;
+        const labelW = metrics.width + padX * 2;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+        ctx.fillRect(x1, y1 - labelH, labelW, labelH);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x1, y1 - labelH, labelW, labelH);
+        ctx.fillStyle = color;
+        ctx.fillText(labelText, x1 + padX, y1 - padY);
+        const markLen = 8;
+        ctx.lineWidth = 2;
+        [[x1,y1],[x2,y1],[x1,y2],[x2,y2]].forEach(([cx,cy]) => {
+          ctx.beginPath();
+          ctx.moveTo(cx - markLen, cy);
+          ctx.lineTo(cx, cy);
+          ctx.lineTo(cx, cy - markLen);
+          ctx.stroke();
+        });
+      });
+      overlayTime.textContent = detections.length > 0 ? (detections[0].inferenceMs || '—') : '—';
+    };
+    img.src = imageURL;
+  }
+
+  function updateCanvasStatus(type, label) {
+    canvasStatus.classList.remove('pass', 'fail', 'ready');
+    canvasStatusDot.style.boxShadow = 'none';
+    canvasStatusDot.style.animation = 'none';
+    if (type === 'pass') {
+      canvasStatus.classList.add('pass');
+      canvasStatusDot.style.background = 'var(--pass)';
+      canvasStatusDot.style.boxShadow = '0 0 8px var(--pass)';
+    } else if (type === 'fail') {
+      canvasStatus.classList.add('fail');
+      canvasStatusDot.style.background = 'var(--fail)';
+      canvasStatusDot.style.boxShadow = '0 0 8px var(--fail)';
+      canvasStatusDot.style.animation = 'fail-pulse 1.2s ease-in-out infinite';
+    } else {
+      canvasStatus.classList.add('ready');
+      canvasStatusDot.style.background = 'var(--text-muted)';
+    }
+    canvasStatusLabel.textContent = label;
+  }
+
+  function resetStatusIndicators() {
+    [indLedStatus, indLedDefects, indLedConfidence].forEach(led => {
+      led.className = 'hmi-indicator-led gray';
+      led.style.boxShadow = 'none';
+      led.style.animation = 'none';
+    });
+    indLabelStatus.textContent     = 'Status: —';
+    indLabelDefects.textContent   = 'Defect: —';
+    indLabelConfidence.textContent= 'Conf: —';
+  }
+  function setStatusIndicators(isPass, defectCount, avgConf) {
+    if (isPass) {
+      indLedStatus.className = 'hmi-indicator-led green';
+      indLedStatus.style.boxShadow = '0 0 10px var(--pass)';
+      indLabelStatus.textContent = 'Status: PASS ✓';
+    } else {
+      indLedStatus.className = 'hmi-indicator-led red';
+      indLedStatus.style.boxShadow = '0 0 10px var(--fail)';
+      indLedStatus.style.animation = 'fail-pulse 1.2s ease-in-out infinite';
+      indLabelStatus.textContent = 'Status: FAIL ✗';
+    }
+    if (defectCount === 0) {
+      indLedDefects.className = 'hmi-indicator-led green';
+      indLedDefects.style.boxShadow = '0 0 8px var(--pass)';
+      indLabelDefects.textContent = 'Defect: 0';
+    } else {
+      indLedDefects.className = 'hmi-indicator-led red';
+      indLedDefects.style.boxShadow = '0 0 8px var(--fail)';
+      indLedDefects.style.animation = 'fail-pulse 1.2s ease-in-out infinite';
+      indLabelDefects.textContent = `Defect: ${defectCount}`;
+    }
+    if (avgConf >= 0.7) {
+      indLedConfidence.className = 'hmi-indicator-led green';
+      indLedConfidence.style.boxShadow = '0 0 8px var(--pass)';
+      indLabelConfidence.textContent = `Conf: ${(avgConf * 100).toFixed(0)}%`;
+    } else if (avgConf > 0.3) {
+      indLedConfidence.style.background = 'var(--warn)';
+      indLedConfidence.style.boxShadow = '0 0 8px var(--warn)';
+      indLedConfidence.className = 'hmi-indicator-led';
+      indLabelConfidence.textContent = `Conf: ${(avgConf * 100).toFixed(0)}%`;
+    } else {
+      indLedConfidence.className = 'hmi-indicator-led red';
+      indLedConfidence.style.boxShadow = '0 0 8px var(--fail)';
+      indLedConfidence.style.animation = 'fail-pulse 1.2s ease-in-out infinite';
+      indLabelConfidence.textContent = `Conf: ${(avgConf * 100).toFixed(0)}%`;
+    }
+  }
+
+  inspectBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+    inspectBtn.disabled = true;
+    inspectBtnLabel.textContent = 'Menginspeksi...';
+    updateCanvasStatus('ready', 'Menganalisis...');
+    const spinner = document.createElement('span');
+    spinner.className = 'spinner-hmi';
+    spinner.id = 'inspectSpinner';
+    inspectBtnLabel.prepend(spinner);
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('conf_threshold', thresholdConf);
+      formData.append('iou_threshold', thresholdIou);
+      formData.append('max_detections', thresholdMaxDet);
+      formData.append('mode', inspectionMode);
+      const startTime = performance.now();
+      const res = await fetch('/upload', { method: 'POST', body: formData });
+      const elapsed = Math.round(performance.now() - startTime);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(errData.detail || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      renderInspectionResult(data, elapsed);
+    } catch (err) {
+      console.error('Inspection error:', err);
+      showToast(`Inspeksi gagal: ${err.message}`, 5000);
+      updateCanvasStatus('ready', 'Gagal');
+      resetStatusIndicators();
+    } finally {
+      const spinnerEl = document.getElementById('inspectSpinner');
+      if (spinnerEl) spinnerEl.remove();
+      inspectBtn.disabled = false;
+      inspectBtnLabel.textContent = 'Inspect Produk';
+    }
+  });
+
+  function renderInspectionResult(data, elapsedMs) {
+    const isPass = data.status === 'Pass';
+    const defects = data.defects || [];
+    const avgConf = defects.length > 0
+      ? defects.reduce((s, d) => s + d.confidence, 0) / defects.length
+      : 0;
+    overlayDot.className = `dot ${isPass ? 'pass' : 'fail'}`;
+    overlayStatus.textContent = isPass ? 'PASS' : 'FAIL · Defect Detected';
+    overlayTime.textContent = `${elapsedMs}ms`;
+    updateCanvasStatus(isPass ? 'pass' : 'fail', isPass ? 'PASS' : `${defects.length} Defect`);
+    setStatusIndicators(isPass, defects.length, avgConf);
+    if (defects.length > 0 && imageURL) {
+      drawBoundingBoxes(defects.map(d => ({ ...d, inferenceMs: elapsedMs })));
+    }
+    addLogEntry({
+      id: ++currentInspectionId,
+      time: new Date().toLocaleTimeString('id-ID', { hour12: false }),
+      filename: data.filename || '—',
+      status: data.status,
+      defects: defects.length,
+      avgConf: avgConf,
+      dims: `${data.image_width || imageDimensions.width}×${data.image_height || imageDimensions.height}`,
+      elapsedMs: elapsedMs
+    });
+    updateCounts();
+    showToast(isPass ? `✓ Produk Lolos QA (${elapsedMs}ms)` : `✗ Defect Terdeteksi: ${defects.length} cacat (${elapsedMs}ms)`, 5000);
+  }
+
+  function addLogEntry(entry) {
+    inspectionLog.unshift(entry);
+    renderLogTable();
+  }
+  function renderLogTable() {
+    if (inspectionLog.length === 0) {
+      logBody.innerHTML = '';
+      logEmpty.style.display = 'flex';
+      logCount.textContent = '0';
+      return;
+    }
+    logEmpty.style.display = 'none';
+    logBody.innerHTML = inspectionLog.map((entry, idx) => {
+      const isFail = entry.status !== 'Pass';
+      const rowClass = isFail ? 'fail-row' : 'pass-row';
+      const badgeHtml = isFail
+        ? `<span class="log-badge fail"><span class="icon"></span>FAIL</span>`
+        : `<span class="log-badge pass"><span class="icon"></span>PASS</span>`;
+      const defectHtml = entry.defects === 0
+        ? `<span class="defect-count">0</span>`
+        : `<span class="defect-count has-defects">${entry.defects}</span>`;
+      const confText = entry.avgConf > 0 ? (entry.avgConf * 100).toFixed(0) + '%' : '—';
+      return `
+        <tr class="${rowClass}">
+          <td style="color:var(--text-muted);">${idx + 1}</td>
+          <td style="color:var(--text-secondary);">${entry.time}</td>
+          <td style="color:var(--text-primary);max-width:180px;overflow:hidden;text-overflow:ellipsis;" title="${entry.filename}">${entry.filename}</td>
+          <td>${badgeHtml}</td>
+          <td>${defectHtml}</td>
+          <td style="color:${entry.avgConf > 0.5 ? 'var(--pass)' : entry.avgConf > 0 ? 'var(--warn)' : 'var(--text-muted)'};">${confText}</td>
+          <td style="color:var(--text-muted);">${entry.dims}</td>
+        </tr>`;
+    }).join('');
+    logCount.textContent = inspectionLog.length;
+  }
+  function updateCounts() { inspectionCount.textContent = `${inspectionLog.length} inspeksi`; }
+  clearLogBtn.addEventListener('click', () => {
+    inspectionLog = [];
+    renderLogTable();
+    updateCounts();
+    showToast('Riwayat dihapus');
+  });
+
+  zoomInBtn.addEventListener('click', () => { drawScale = Math.min(drawScale * 1.25, 5); applyTransform(); });
+  zoomOutBtn.addEventListener('click', () => { drawScale = Math.max(drawScale / 1.25, 0.2); applyTransform(); });
+  fitBtn.addEventListener('click', () => { drawScale = 1; drawOffsetX = 0; drawOffsetY = 0; canvas.width = imageDimensions.width; canvas.height = imageDimensions.height; applyTransform(); });
+  function applyTransform() {
+    if (!imageDimensions.width) return;
+    canvas.width  = imageDimensions.width  * drawScale;
+    canvas.height = imageDimensions.height * drawScale;
+    ctx.scale(drawScale, drawScale);
+  }
+
+  let toastTimer = null;
+  function showToast(msg, duration = 3000) {
+    let toast = document.querySelector('.hmi-toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.className = 'hmi-toast';
+      const isFail = msg.includes('✗') || msg.includes('gagal');
+      toast.style.cssText = `
+        position: fixed; bottom: 20px; right: 20px; z-index: 1000;
+        padding: 12px 20px; border-radius: 8px; font-family: 'Space Grotesk', sans-serif;
+        font-size: 13px; font-weight: 600; box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        backdrop-filter: blur(12px); transform: translateY(20px); opacity: 0;
+        transition: all 0.25s ease; max-width: 360px;
+        background: ${isFail ? 'rgba(239,68,68,0.92)' : 'rgba(34,197,94,0.92)'};
+        color: white;
+        border: 1px solid ${isFail ? 'rgba(239,68,68,0.5)' : 'rgba(34,197,94,0.3)'};
+      `;
+      document.body.appendChild(toast);
+    }
+    toast.textContent = msg;
+    toast.style.transform = 'translateY(0)';
+    toast.style.opacity = '1';
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      toast.style.transform = 'translateY(20px)';
+      toast.style.opacity = '0';
+    }, duration);
+  }
+
+  function formatBytes(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      if (!inspectBtn.disabled) inspectBtn.click();
+    }
+  });
+
+  clearCanvasImage();
+  renderLogTable();
+  updateCounts();
+
+})();
+</script>
+</body>
+</html>
